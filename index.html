@@ -65,6 +65,7 @@
       padding: 24px;
       backdrop-filter: blur(12px);
       box-shadow: 0 20px 60px var(--shadow);
+      overflow: hidden;
     }
 
     .panel h1 {
@@ -74,7 +75,7 @@
     }
 
     .panel p {
-      margin: 0 0 20px;
+      margin: 0 0 16px;
       opacity: 0.8;
       line-height: 1.5;
     }
@@ -118,9 +119,55 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
+    button.secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
     button:hover {
       transform: translateY(-2px) scale(1.01);
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .gallery {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .thumbs {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 72px;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+    }
+
+    .thumb {
+      width: 72px;
+      height: 56px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s ease, border 0.2s ease;
+      background: rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb.active {
+      border-color: var(--accent);
+      transform: translateY(-2px);
     }
 
     .stage {
@@ -163,24 +210,55 @@
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
       transition: transform 0.2s ease;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
     }
 
-    .card img {
+    .layer {
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      overflow: hidden;
+      transform-style: preserve-3d;
+    }
+
+    .layer.image {
+      transform: translateZ(var(--card-depth));
+    }
+
+    .layer.edge {
+      transform: translateZ(calc(var(--card-depth) * -1));
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.4));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 0 40px rgba(0, 0, 0, 0.6);
+      filter: blur(0.2px);
+    }
+
+    .layer.image img {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
 
+    .frame {
+      position: absolute;
+      inset: -10px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      transform: translateZ(calc(var(--card-depth) + 4px));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+    }
+
     .card .gloss {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.3), transparent 55%);
+      border-radius: 24px;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.35), transparent 55%);
       mix-blend-mode: screen;
       opacity: 0.8;
       pointer-events: none;
       transition: opacity 0.2s ease;
+      transform: translateZ(calc(var(--card-depth) + 8px));
     }
 
     .hint {
@@ -213,63 +291,113 @@
   <div class="layout">
     <section class="panel">
       <h1>3D 图片查看器</h1>
-      <p>拖拽旋转、滚轮缩放，像在空间里“摸”图片。你也可以上传自己的图片。</p>
+      <p>拖拽旋转、滚轮缩放、手机陀螺仪联动。支持多图切换与更强的立体层次。</p>
       <div class="controls">
         <label>上传图片</label>
-        <input id="fileInput" type="file" accept="image/*" />
+        <input id="fileInput" type="file" accept="image/*" multiple />
 
         <label for="tilt">倾斜强度</label>
         <input id="tilt" type="range" min="5" max="40" value="18" />
 
-        <label for="depth">纵深</label>
-        <input id="depth" type="range" min="0" max="200" value="40" />
+        <label for="depth">立体厚度</label>
+        <input id="depth" type="range" min="10" max="120" value="40" />
 
         <div class="button-row">
           <button id="resetBtn">重置视角</button>
           <button id="autoBtn">自动旋转</button>
+          <button id="gyroBtn" class="secondary">启用陀螺仪</button>
+          <button id="prevBtn" class="secondary">上一张</button>
+          <button id="nextBtn" class="secondary">下一张</button>
         </div>
+      </div>
+
+      <div class="gallery">
+        <label>画廊</label>
+        <div class="thumbs" id="thumbs"></div>
       </div>
     </section>
 
     <section class="stage">
       <div class="viewer" id="viewer">
         <div class="card" id="card">
-          <img id="image" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80" alt="3D preview" />
+          <div class="layer edge"></div>
+          <div class="layer image"><img id="image" src="" alt="3D preview" /></div>
+          <div class="frame"></div>
           <div class="gloss"></div>
         </div>
       </div>
-      <div class="hint">拖拽 / 滚轮 / 双击</div>
+      <div class="hint">拖拽 / 滚轮 / 双击 / 手机晃动</div>
     </section>
   </div>
 
   <script>
     const viewer = document.getElementById("viewer");
     const card = document.getElementById("card");
-    const gloss = card.querySelector(".gloss");
     const image = document.getElementById("image");
     const fileInput = document.getElementById("fileInput");
     const tiltInput = document.getElementById("tilt");
     const depthInput = document.getElementById("depth");
     const resetBtn = document.getElementById("resetBtn");
     const autoBtn = document.getElementById("autoBtn");
+    const gyroBtn = document.getElementById("gyroBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const thumbs = document.getElementById("thumbs");
+
+    const defaultImages = [
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?auto=format&fit=crop&w=1200&q=80"
+    ];
+
+    let gallery = [...defaultImages];
+    let activeIndex = 0;
 
     let rotateX = 0;
     let rotateY = 0;
+    let baseRotateX = 0;
+    let baseRotateY = 0;
     let zoom = 1;
     let isDragging = false;
     let startX = 0;
     let startY = 0;
     let autoRotate = false;
     let autoFrame = null;
+    let gyroEnabled = false;
 
     function applyTransform() {
       const depth = Number(depthInput.value);
-      card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${depth}px) scale(${zoom})`;
+      card.style.setProperty("--card-depth", `${depth}px`);
+      const finalX = rotateX + baseRotateX;
+      const finalY = rotateY + baseRotateY;
+      card.style.transform = `rotateX(${finalX}deg) rotateY(${finalY}deg) scale(${zoom})`;
     }
 
     function setGloss(x, y) {
       card.style.setProperty("--mx", `${x}%`);
       card.style.setProperty("--my", `${y}%`);
+    }
+
+    function renderThumbs() {
+      thumbs.innerHTML = "";
+      gallery.forEach((src, index) => {
+        const btn = document.createElement("button");
+        btn.className = `thumb${index === activeIndex ? " active" : ""}`;
+        btn.type = "button";
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = `thumb-${index + 1}`;
+        btn.appendChild(img);
+        btn.addEventListener("click", () => selectImage(index));
+        thumbs.appendChild(btn);
+      });
+    }
+
+    function selectImage(index) {
+      activeIndex = (index + gallery.length) % gallery.length;
+      image.src = gallery[activeIndex];
+      renderThumbs();
     }
 
     viewer.addEventListener("mousedown", (event) => {
@@ -314,16 +442,19 @@
     });
 
     fileInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      image.src = url;
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      const newImages = files.map((file) => URL.createObjectURL(file));
+      gallery = [...newImages, ...gallery];
+      selectImage(0);
     });
 
     resetBtn.addEventListener("click", () => {
       rotateX = 0;
       rotateY = 0;
       zoom = 1;
+      baseRotateX = 0;
+      baseRotateY = 0;
       applyTransform();
     });
 
@@ -346,6 +477,54 @@
       }
     });
 
+    prevBtn.addEventListener("click", () => {
+      selectImage(activeIndex - 1);
+    });
+
+    nextBtn.addEventListener("click", () => {
+      selectImage(activeIndex + 1);
+    });
+
+    function enableGyro() {
+      gyroEnabled = true;
+      gyroBtn.textContent = "已启用陀螺仪";
+      gyroBtn.disabled = true;
+      window.addEventListener("deviceorientation", (event) => {
+        if (!gyroEnabled) return;
+        const beta = event.beta || 0;
+        const gamma = event.gamma || 0;
+        const targetX = Math.max(-15, Math.min(15, beta / 4));
+        const targetY = Math.max(-20, Math.min(20, gamma / 3));
+        baseRotateX = baseRotateX + (targetX - baseRotateX) * 0.08;
+        baseRotateY = baseRotateY + (targetY - baseRotateY) * 0.08;
+        applyTransform();
+      });
+    }
+
+    gyroBtn.addEventListener("click", async () => {
+      if (!window.DeviceOrientationEvent) {
+        gyroBtn.textContent = "设备不支持陀螺仪";
+        gyroBtn.disabled = true;
+        return;
+      }
+
+      if (typeof DeviceOrientationEvent.requestPermission === "function") {
+        try {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission === "granted") {
+            enableGyro();
+          } else {
+            gyroBtn.textContent = "陀螺仪被拒绝";
+          }
+        } catch (error) {
+          gyroBtn.textContent = "陀螺仪不可用";
+        }
+      } else {
+        enableGyro();
+      }
+    });
+
+    selectImage(0);
     applyTransform();
   </script>
 </body>
